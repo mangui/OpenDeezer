@@ -415,6 +415,7 @@ class PlayerController(private val scope: CoroutineScope) {
         shuffleEnabled = on
         sendMode { Engine.setShuffle(if (on) 1 else 0) }
         reconcilePreload()
+        pushImmediate()
     }
 
     // Forwards a local repeat/shuffle change to the engine off the main thread (a

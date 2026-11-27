@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +28,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.cyclooo.opendeezer.R
@@ -40,8 +46,11 @@ fun PlayerBar(
     onToggle: () -> Unit,
     onNext: () -> Unit,
     onPrev: () -> Unit,
+    onShuffle: () -> Unit,
 ) {
     val track = state.current ?: return
+    val compact = LocalConfiguration.current.screenWidthDp < 560
+    val shuffleDescription = stringResource(if (state.shuffle) R.string.shuffle_on else R.string.shuffle_off)
     val progress = if (state.durationMs > 0) {
         (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
     } else 0f
@@ -90,8 +99,23 @@ fun PlayerBar(
                         }
                     }
                 }
-                IconButton(onClick = onPrev, enabled = state.hasPrev) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.action_previous))
+                IconButton(
+                    onClick = onShuffle,
+                    modifier = Modifier.size(48.dp).semantics { stateDescription = shuffleDescription },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (state.shuffle) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
+                    ),
+                ) {
+                    Icon(
+                        Icons.Filled.Shuffle,
+                        contentDescription = stringResource(R.string.cd_shuffle),
+                        tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (!compact) {
+                    IconButton(onClick = onPrev, enabled = state.hasPrev) {
+                        Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.action_previous))
+                    }
                 }
                 FilledIconButton(onClick = onToggle, modifier = Modifier.size(48.dp)) {
                     Icon(

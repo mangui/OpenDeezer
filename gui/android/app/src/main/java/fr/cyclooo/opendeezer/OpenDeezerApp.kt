@@ -155,6 +155,7 @@ private fun MainScaffold(vm: AppViewModel) {
                     onToggle = player::togglePause,
                     onNext = player::next,
                     onPrev = player::prev,
+                    onShuffle = { player.setShuffle(!playerState.shuffle) },
                 )
             }
         },

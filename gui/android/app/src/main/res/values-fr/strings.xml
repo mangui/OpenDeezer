@@ -67,6 +67,8 @@
     <string name="greeting_named">%1$s, %2$s</string>
     <string name="home_subtitle">Toute votre musique, à portée de main.</string>
     <string name="home_see_all">Tout voir</string>
+    <string name="shuffle_on">Lecture aléatoire activée</string>
+    <string name="shuffle_off">Lecture aléatoire désactivée</string>
     <string name="home_liked">Titres favoris</string>
     <string name="section_top_tracks">Top titres</string>
     <string name="section_your_playlists">Vos playlists</string>
