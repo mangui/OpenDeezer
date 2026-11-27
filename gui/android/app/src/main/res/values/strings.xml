@@ -194,6 +194,7 @@
     <string name="download_failed">Download failed: %1$s</string>
     <string name="download_failed_generic">Download failed</string>
     <string name="favorite_update_failed">Couldn\'t update Like — check your connection.</string>
+    <string name="playback_start_failed">Couldn\'t play “%1$s”. The previous track was kept.</string>
     <string name="preview_chip">Preview</string>
     <string name="account_free_hint">Free account · standard quality (128 kbps)</string>
 

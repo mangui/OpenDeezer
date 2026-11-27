@@ -243,8 +243,13 @@ func clearEnginePreload() {
 
 var (
 	metaMu       sync.Mutex
-	pendingMetas = map[string]mediacache.StreamMeta{} // trackID -> meta captured on network resolve; committed on natural finish
+	pendingMetas = map[string]pendingStreamMeta{} // library ID -> resolved media ID + metadata
 )
+
+type pendingStreamMeta struct {
+	mediaID string
+	meta    mediacache.StreamMeta
+}
 
 // storePendingMeta remembers the StreamMeta from a network-sourced plan so that
 // noteTrackFinished (on natural end, after the tee has committed the body) can
@@ -260,12 +265,12 @@ func storePendingMeta(id string, plan *deezer.StreamPlan) {
 		Preview:   plan.Preview,
 	}
 	metaMu.Lock()
-	pendingMetas[id] = m
+	pendingMetas[id] = pendingStreamMeta{mediaID: plan.TrackID, meta: m}
 	metaMu.Unlock()
 }
 
 // takePendingMeta removes and returns a stored meta (called on natural finish).
-func takePendingMeta(id string) (mediacache.StreamMeta, bool) {
+func takePendingMeta(id string) (pendingStreamMeta, bool) {
 	metaMu.Lock()
 	m, ok := pendingMetas[id]
 	if ok {
@@ -2242,8 +2247,10 @@ func noteTrackFinished() {
 	// zero network on future plays (and across restarts).
 	if mc := curMediaCache(); mc != nil && prev.ID != "" {
 		if m, ok := takePendingMeta(prev.ID); ok {
-			key := prev.ID + "." + m.Format
-			_ = mc.PutMeta(key, m)
+			// FALLBACK may play a different media ID. Its ciphertext is
+			// cached under that ID, so never attach metadata to the old ID.
+			key := m.mediaID + "." + m.meta.Format
+			_ = mc.PutMeta(key, m.meta)
 		}
 	}
 }

@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -107,6 +109,13 @@ class PlayerController(private val scope: CoroutineScope) {
     // auto-advance on a finish of the *previous* track (it would double-advance).
     private var startGen: Int = 0
     private var startInFlight: Boolean = false
+    private val startMutex = Mutex()
+    // Keep the last confirmed playback queue: a failed resolve must not make
+    // the UI advance while the engine is still playing the previous track.
+    private var playingQueue: List<Track> = emptyList()
+    private var playingIndex: Int = -1
+    private val _playbackFailures = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val playbackFailures: SharedFlow<String> = _playbackFailures.asSharedFlow()
     // Gapless: id of the queue track armed engine-side via Engine.preload, or
     // null when nothing is armed. When the armed track matches the deterministic
     // next entry at a track boundary, poll() advances the queue pointer without
@@ -460,20 +469,34 @@ class PlayerController(private val scope: CoroutineScope) {
 
     private fun startCurrent() {
         val t = queue.getOrNull(index) ?: return
+        val requestedQueue = queue
+        val requestedIndex = index
         val gen = ++startGen
         startInFlight = true
         // A full play discards any armed preload engine-side; forget ours too so
         // armPreload() re-arms (or clears) from scratch after the start lands.
         preloadedId = null
         scope.launch {
-            if (t.isEpisode) Engine.playEpisode(t.id, t.durationMs) else Engine.play(t.id, t.durationMs)
-            if (gen == startGen) {
-                // Baseline after the new track actually replaced the old one, so a
-                // natural finish during the async start can't trigger an advance.
+            val started = startMutex.withLock {
+                if (gen != startGen) return@withLock null // superseded before starting
+                val ok = if (t.isEpisode) Engine.playEpisode(t.id, t.durationMs) else Engine.play(t.id, t.durationMs)
+                if (ok) {
+                    playingQueue = requestedQueue
+                    playingIndex = requestedIndex
+                }
+                ok
+            }
+            if (started != null && gen == startGen) {
+                if (!started) {
+                    queue = playingQueue
+                    index = playingIndex
+                    _playbackFailures.tryEmit(t.name)
+                }
+                // Baseline on both success and failure so the old track's
+                // finish cannot double-advance the queue after an async start.
                 lastFinished = Engine.finishedCount()
                 startInFlight = false
-                // Gapless: arm the deterministic next track once this one is live.
-                armPreload()
+                if (started) armPreload()
             }
             pushImmediate()
         }
@@ -577,6 +600,8 @@ class PlayerController(private val scope: CoroutineScope) {
         val adoptedId = snap.tracks.getOrNull(newIndex)?.id
         val engineLive = Engine.state() == Engine.PLAYING || Engine.state() == Engine.LOADING
         if (engineNow != null && engineNow.id == adoptedId && engineLive) {
+            playingQueue = queue
+            playingIndex = index
             lastFinished = Engine.finishedCount()
             scope.launch { armPreload() }
             pushImmediate()
@@ -607,6 +632,8 @@ class PlayerController(private val scope: CoroutineScope) {
                 Engine.state() == Engine.PLAYING
             ) {
                 index = n
+                playingQueue = queue
+                playingIndex = index
                 preloadedId = null
                 scope.launch { armPreload() }
                 push()

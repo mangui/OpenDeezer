@@ -135,6 +135,13 @@ private fun MainScaffold(vm: AppViewModel) {
         }
     }
 
+    LaunchedEffect(player) {
+        player.playbackFailures.collect { trackName ->
+            snackbarHostState.currentSnackbarData?.dismiss()
+            launch { snackbarHostState.showSnackbar(context.getString(R.string.playback_start_failed, trackName)) }
+        }
+    }
+
     Scaffold(
         // Inner screen Scaffolds manage system-bar insets; this outer one only
         // contributes the bottom player bar so the top inset isn't applied twice.
