@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -240,6 +244,7 @@ private fun TrackInfo(track: Track, state: PlayerState) {
 }
 
 /** Seek bar, transport buttons, shuffle/repeat, volume and the format line. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerControls(
     state: PlayerState,
@@ -263,7 +268,7 @@ private fun PlayerControls(
     val livePosFraction = (state.positionMs.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
     val sliderValue = if (scrubbing) scrubValue else livePosFraction
 
-    Slider(
+    SlimSlider(
         value = sliderValue,
         onValueChange = { scrubbing = true; scrubValue = it },
         onValueChangeFinished = {
@@ -276,7 +281,7 @@ private fun PlayerControls(
         Text(formatDuration(state.durationMs), style = MaterialTheme.typography.labelSmall)
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(12.dp))
 
     Row(
         Modifier.fillMaxWidth(),
@@ -314,7 +319,7 @@ private fun PlayerControls(
         }
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(6.dp))
 
     // B4: Shuffle and Repeat controls. Clicking them updates local queue
     //     behaviour and forwards the new mode to any connected remote device
@@ -364,12 +369,33 @@ private fun PlayerControls(
         }
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(10.dp))
 
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.VolumeUp, contentDescription = stringResource(R.string.cd_volume), modifier = Modifier.size(20.dp))
-        Spacer(Modifier.size(8.dp))
-        Slider(
+    // Technical audio info stays quiet; volume is a compact secondary control.
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End,
+    ) {
+        if (state.format.isNotBlank()) {
+            Text(
+                state.format,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
+        Icon(
+            Icons.Filled.VolumeUp,
+            contentDescription = stringResource(R.string.cd_volume),
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(8.dp))
+        SlimSlider(
             value = volDrag ?: state.volume.toFloat().coerceIn(0f, 1f),
             onValueChange = {
                 volDrag = it
@@ -381,16 +407,28 @@ private fun PlayerControls(
                 volDrag?.let { player.setVolume(it.toDouble()) }
                 volDrag = null
             },
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.width(192.dp),
         )
     }
+}
 
-    if (state.format.isNotBlank()) {
-        Text(
-            state.format,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    Spacer(Modifier.height(16.dp))
+/** A slim visual track that retains Slider's full accessibility and touch target. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SlimSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
+        modifier = modifier,
+        thumb = { Box(Modifier.size(12.dp).background(MaterialTheme.colorScheme.primary, CircleShape)) },
+        track = { sliderState ->
+            SliderDefaults.Track(sliderState, modifier = Modifier.height(4.dp))
+        },
+    )
 }

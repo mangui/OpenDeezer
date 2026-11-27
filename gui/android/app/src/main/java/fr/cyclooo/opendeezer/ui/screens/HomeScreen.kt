@@ -104,24 +104,29 @@ private fun QuickPickCard(pick: QuickPick, modifier: Modifier, onNavigate: (Stri
 }
 
 @Composable
-private fun TopTrackCard(track: Track, onClick: () -> Unit) {
+private fun TopTrackCard(
+    track: Track,
+    modifier: Modifier = Modifier.width(290.dp).height(88.dp),
+    compact: Boolean = false,
+    onClick: () -> Unit,
+) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.width(290.dp).height(88.dp),
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     ) {
         Row(
-            Modifier.padding(10.dp),
+            Modifier.padding(if (compact) 7.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Artwork(track.artworkUrl, Modifier.size(64.dp), corner = 10)
+            Artwork(track.artworkUrl, Modifier.size(if (compact) 48.dp else 64.dp), corner = 10)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     track.name.ifBlank { stringResource(R.string.unknown_title) },
-                    style = MaterialTheme.typography.titleMedium,
+                    style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -157,6 +162,7 @@ fun HomeScreen(
 ) {
     var showProfiles by remember { mutableStateOf(false) }
     val compactHeader = LocalConfiguration.current.screenWidthDp < 700
+    val portalDashboard = LocalConfiguration.current.screenWidthDp >= 1000
     LaunchedEffect(Unit) { onLoadFamilyProfiles() }
     LaunchedEffect(accountId) { showProfiles = false }
     val homeData by produceState<HomeData?>(initialValue = null, key1 = accountId) {
@@ -323,7 +329,7 @@ fun HomeScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(22.dp)) }
+            item { Spacer(Modifier.height(12.dp)) }
 
             // 3 & 4. Dynamic sections — show spinner until data arrives
             if (data == null) {
@@ -338,6 +344,62 @@ fun HomeScreen(
                     }
                 }
             } else {
+                // Portal Go: both sections remain discoverable without scrolling.
+                // Keep the familiar stacked rails for portrait and narrow screens.
+                if (data.playlists.isNotEmpty() && data.topTracks.isNotEmpty() && portalDashboard) {
+                    item {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Column(Modifier.weight(0.61f)) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        stringResource(R.string.section_your_playlists),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    TextButton(onClick = { onNavigate(Routes.PLAYLISTS) }) {
+                                        Text(stringResource(R.string.home_see_all))
+                                    }
+                                }
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(data.playlists, key = { "hp-${it.id}" }) { pl ->
+                                        MediaCard(
+                                            title = pl.name,
+                                            subtitle = if (pl.trackCount > 0) {
+                                                pluralStringResource(R.plurals.n_tracks, pl.trackCount, pl.trackCount)
+                                            } else pl.owner,
+                                            artworkUrl = pl.artworkUrl,
+                                            onClick = { onPlaylist(pl) },
+                                        )
+                                    }
+                                }
+                            }
+                            Column(
+                                Modifier.weight(0.39f),
+                                verticalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.section_top_tracks),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                )
+                                data.topTracks.take(4).forEachIndexed { index, track ->
+                                    TopTrackCard(
+                                        track = track,
+                                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                                        compact = true,
+                                    ) { player.playQueue(data.topTracks, index) }
+                                }
+                            }
+                        }
+                    }
+                } else {
                 // Lead with the listener's collection: artwork is the most
                 // useful visual navigation landmark on a large touch screen.
                 if (data.playlists.isNotEmpty()) {
@@ -392,6 +454,7 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }

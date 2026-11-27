@@ -27,6 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import fr.cyclooo.opendeezer.engine.Engine
+import fr.cyclooo.opendeezer.engine.Playlist
 import fr.cyclooo.opendeezer.ui.LocalFoldState
 import fr.cyclooo.opendeezer.ui.components.PlayerBar
 import fr.cyclooo.opendeezer.ui.components.UpdateBanner
@@ -86,10 +87,15 @@ private fun MainScaffold(vm: AppViewModel) {
     val player = vm.player
     val playerState by player.state.collectAsState()
     var showConnect by remember { mutableStateOf(false) }
+    var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
     fun nav(route: String) = navController.navigate(route)
+    fun openPlaylist(playlist: Playlist) {
+        selectedPlaylist = playlist
+        nav(Routes.playlist(playlist.id, playlist.name))
+    }
     val back: () -> Unit = { navController.popBackStack() }
 
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -175,7 +181,7 @@ private fun MainScaffold(vm: AppViewModel) {
                     connected = playerState.connectedDevice.isNotBlank(),
                     player = player,
                     onNavigate = { nav(it) },
-                    onPlaylist = { nav(Routes.playlist(it.id, it.name)) },
+                    onPlaylist = ::openPlaylist,
                     onCast = { showConnect = true },
                     onSettings = { nav(Routes.SETTINGS) },
                     onLoadFamilyProfiles = vm::loadFamilyProfiles,
@@ -202,7 +208,7 @@ private fun MainScaffold(vm: AppViewModel) {
                 if (fold.isBook && hinge != null) {
                     PlaylistsBookScreen(player = player, hingeBounds = hinge, onBack = back)
                 } else {
-                    PlaylistsScreen(onBack = back, onOpen = { nav(Routes.playlist(it.id, it.name)) })
+                    PlaylistsScreen(onBack = back, onOpen = ::openPlaylist)
                 }
             }
             composable(Routes.PLAYLIST) { entry ->
@@ -210,6 +216,7 @@ private fun MainScaffold(vm: AppViewModel) {
                 val name = entry.arguments?.getString("name").orEmpty()
                 TrackListScreen(
                     title = name,
+                    playlist = selectedPlaylist?.takeIf { it.id == id },
                     player = player,
                     onBack = back,
                     onBulkDownload = { player.downloadPlaylist(id, name) },
@@ -245,7 +252,7 @@ private fun MainScaffold(vm: AppViewModel) {
                     onBack = back,
                     onAlbum = { nav(Routes.album(it.id, it.name)) },
                     onArtist = { nav(Routes.artist(it.id, it.name)) },
-                    onPlaylist = { nav(Routes.playlist(it.id, it.name)) },
+                    onPlaylist = ::openPlaylist,
                 )
             }
             composable(Routes.SEARCH) {
@@ -254,7 +261,7 @@ private fun MainScaffold(vm: AppViewModel) {
                     onBack = back,
                     onAlbum = { nav(Routes.album(it.id, it.name)) },
                     onArtist = { nav(Routes.artist(it.id, it.name)) },
-                    onPlaylist = { nav(Routes.playlist(it.id, it.name)) },
+                    onPlaylist = ::openPlaylist,
                 )
             }
             composable(Routes.PODCASTS) {

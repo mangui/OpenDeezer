@@ -25,6 +25,7 @@
     <string name="action_next">Next</string>
     <string name="action_previous">Previous</string>
     <string name="action_play_all">Play all</string>
+    <string name="action_shuffle_play">Shuffle play</string>
     <string name="action_login">Log in</string>
     <string name="common_enable">Enable</string>
     <string name="common_off">Off</string>
