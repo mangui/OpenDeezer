@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="family_profiles_title">Profils Deezer Famille</string>
+    <string name="family_current"> (actuel)</string>
+    <string name="family_switch_error">Changement impossible. Le profil précédent reste actif.</string>
     <string name="app_name">OpenDeezer</string>
 
     <string name="action_back">Retour</string>
@@ -15,6 +18,7 @@
     <string name="action_next">Suivant</string>
     <string name="action_previous">Précédent</string>
     <string name="action_play_all">Tout lire</string>
+    <string name="action_shuffle_play">Lecture aléatoire</string>
     <string name="action_login">Se connecter</string>
     <string name="common_enable">Activer</string>
     <string name="common_off">Désactivé</string>
@@ -62,6 +66,10 @@
     <string name="greeting_afternoon">Bon après-midi</string>
     <string name="greeting_evening">Bonsoir</string>
     <string name="greeting_named">%1$s, %2$s</string>
+    <string name="home_subtitle">Toute votre musique, à portée de main.</string>
+    <string name="home_see_all">Tout voir</string>
+    <string name="shuffle_on">Lecture aléatoire activée</string>
+    <string name="shuffle_off">Lecture aléatoire désactivée</string>
     <string name="home_liked">Titres favoris</string>
     <string name="section_top_tracks">Top titres</string>
     <string name="section_your_playlists">Vos playlists</string>
@@ -234,6 +242,7 @@
     <string name="download_failed">Échec du téléchargement : %1$s</string>
     <string name="download_failed_generic">Échec du téléchargement</string>
     <string name="favorite_update_failed">Impossible de modifier « J\'aime » — vérifiez votre connexion.</string>
+    <string name="playback_start_failed">Impossible de lire « %1$s ». Le titre précédent est conservé.</string>
     <string name="preview_chip">Extrait</string>
     <string name="account_free_hint">Compte gratuit · qualité standard (128 kbps)</string>
     <string name="settings_ads">Publicités</string>
@@ -266,7 +275,9 @@
     </plurals>
     <!-- Éditeur de file + téléchargement hors ligne -->
     <string name="action_play_next">Lire ensuite</string>
-    <string name="action_add_to_queue">Ajouter à la file</string>
+    <string name="action_add_to_queue">Ajouter en dernier</string>
+    <string name="queue_added_next">À suivre : %1$s</string>
+    <string name="queue_added_last">Ajouté à la fin : %1$s</string>
     <string name="action_clear_queue">Vider la file</string>
     <string name="action_download_offline">Télécharger hors ligne</string>
     <string name="action_remove">Retirer</string>

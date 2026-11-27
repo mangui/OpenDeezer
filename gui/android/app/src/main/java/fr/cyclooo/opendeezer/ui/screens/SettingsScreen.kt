@@ -65,6 +65,7 @@ import fr.cyclooo.opendeezer.data.Prefs
 import fr.cyclooo.opendeezer.engine.Account
 import fr.cyclooo.opendeezer.engine.ConnectHostInfo
 import fr.cyclooo.opendeezer.engine.Engine
+import fr.cyclooo.opendeezer.engine.FamilyProfile
 import fr.cyclooo.opendeezer.engine.UpdateInfo
 import fr.cyclooo.opendeezer.engine.WebRemoteInfo
 import fr.cyclooo.opendeezer.ui.theme.LocalMaterialYou
@@ -78,7 +79,18 @@ private const val MEDIA_CACHE_MAX = 4096
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(account: Account?, onBack: () -> Unit, onEqualizer: () -> Unit, onLogout: () -> Unit) {
+fun SettingsScreen(
+    account: Account?,
+    familyProfiles: List<FamilyProfile>,
+    familyBusy: Boolean,
+    familyError: Boolean,
+    onLoadFamilyProfiles: () -> Unit,
+    onSelectFamilyProfile: (String) -> Unit,
+    onBack: () -> Unit,
+    onEqualizer: () -> Unit,
+    onLogout: () -> Unit,
+) {
+    LaunchedEffect(Unit) { onLoadFamilyProfiles() }
     var quality by remember { mutableIntStateOf(Engine.quality()) }
     var replayGain by remember { mutableStateOf(Engine.replayGain()) }
     var gapless by remember { mutableStateOf(Engine.gapless()) }
@@ -481,6 +493,23 @@ fun SettingsScreen(account: Account?, onBack: () -> Unit, onEqualizer: () -> Uni
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            if (familyProfiles.size > 1) {
+                HorizontalDivider()
+                Text(stringResource(R.string.family_profiles_title), style = MaterialTheme.typography.titleMedium)
+                familyProfiles.forEach { member ->
+                    OutlinedButton(
+                        onClick = { onSelectFamilyProfile(if (member.isAdmin) "" else member.userId) },
+                        enabled = !familyBusy && member.userId != account?.userId,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(member.name + if (member.userId == account?.userId) stringResource(R.string.family_current) else "")
+                    }
+                }
+            }
+            if (familyBusy) CircularProgressIndicator()
+            if (familyError) {
+                Text(stringResource(R.string.family_switch_error), color = MaterialTheme.colorScheme.error)
             }
             OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_sign_out))

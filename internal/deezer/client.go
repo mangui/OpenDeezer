@@ -606,13 +606,15 @@ func (c *Client) restGet(path string) ([]byte, error) {
 	return b, nil
 }
 
-// gwCover builds a 250x250 cover URL from an md5 image hash.
-func gwCover(md5 string) string {
+// gwPicture builds a 250x250 image URL from its type and md5 hash.
+func gwPicture(kind, md5 string) string {
 	if md5 == "" {
 		return ""
 	}
-	return "https://e-cdns-images.dzcdn.net/images/cover/" + md5 + "/250x250-000000-80-0-0.jpg"
+	return "https://e-cdns-images.dzcdn.net/images/" + kind + "/" + md5 + "/250x250-000000-80-0-0.jpg"
 }
+
+func gwCover(md5 string) string { return gwPicture("cover", md5) }
 
 // ---- REST DTOs ----
 
@@ -1029,6 +1031,7 @@ func (c *Client) Playlists() ([]Playlist, error) {
 							Title           string      `json:"TITLE"`
 							NbSong          json.Number `json:"NB_SONG"`
 							PlaylistPicture string      `json:"PLAYLIST_PICTURE"`
+							PictureType     string      `json:"PICTURE_TYPE"`
 						} `json:"data"`
 					} `json:"playlists"`
 				} `json:"TAB"`
@@ -1040,11 +1043,15 @@ func (c *Client) Playlists() ([]Playlist, error) {
 		page := r.Results.Tab.Playlists.Data
 		for _, p := range page {
 			n, _ := p.NbSong.Int64()
+			kind := p.PictureType
+			if kind == "" {
+				kind = "playlist"
+			}
 			out = append(out, Playlist{
 				ID:         p.PlaylistID.String(),
 				Name:       p.Title,
 				TrackCount: int(n),
-				ArtworkURL: gwCover(p.PlaylistPicture),
+				ArtworkURL: gwPicture(kind, p.PlaylistPicture),
 			})
 		}
 		if len(page) < plPage {
@@ -1054,25 +1061,27 @@ func (c *Client) Playlists() ([]Playlist, error) {
 	return out, nil
 }
 
-// trackToken fetches the per-track token needed for media URL resolution, plus
-// the track's ReplayGain (dB) so playback can be loudness-normalized. GAIN is
-// already present in the song.getData payload, so this costs no extra request.
-func (c *Client) trackToken(trackID string) (token string, gainDB float64, err error) {
+// trackToken also returns Deezer's replacement track ID. Older favourites can
+// have a token that is no longer entitled, even though FALLBACK is playable.
+func (c *Client) trackToken(trackID string) (token string, gainDB float64, fallbackID string, err error) {
 	b, err := c.gw("song.getData", fmt.Sprintf(`{"sng_id":%s}`, jsonEsc(trackID)))
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 	var r struct {
 		Results struct {
 			TrackToken string      `json:"TRACK_TOKEN"`
 			Gain       json.Number `json:"GAIN"`
+			Fallback   struct {
+				SngID json.Number `json:"SNG_ID"`
+			} `json:"FALLBACK"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal(b, &r); err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 	g, _ := strconv.ParseFloat(r.Results.Gain.String(), 64)
-	return r.Results.TrackToken, g, nil
+	return r.Results.TrackToken, g, r.Results.Fallback.SngID.String(), nil
 }
 
 // StreamPlan is the resolved CDN URL + track id for decryption.
@@ -1254,36 +1263,43 @@ func (c *Client) trackPreview(trackID string) (string, error) {
 	return r.Preview, nil
 }
 
-// PrepareStream resolves a track id to a playable stream. It first tries the
-// full, entitled track (encrypted CDN URL). When full-track resolution is
-// refused with an entitlement rejection (ErrNoFullMedia) it falls back to
-// Deezer's public 30-second preview (plain MP3, .Preview==true) so free
-// accounts can still play. Transient errors (5xx, transport, rate limits) from
-// resolveMediaURL are retried inside the resolver and, if still failing,
-// returned as-is — a premium user never gets a 30 s clip during a CDN hiccup.
+// PrepareStream resolves a track id to a playable stream. When Deezer denies
+// an older recording but supplies FALLBACK, try that replacement first. The
+// plan must use the replacement ID for stripe decryption, while callers keep
+// the original library ID. Only entitlement failures fall back to the public
+// 30-second preview; transient errors are returned without downgrading.
 func (c *Client) PrepareStream(trackID string) (*StreamPlan, error) {
 	if !c.LoggedIn() {
 		return nil, fmt.Errorf("not logged in")
 	}
-	tok, gain, err := c.trackToken(trackID)
-	if err == nil && tok != "" {
-		u, format, mErr := c.resolveMediaURL(tok)
-		if mErr == nil {
-			// Refresh re-resolves a fresh signed URL for the same track when the
-			// CDN token expires mid-download; PrepareStream already retries the
-			// media call (re-login on rejection), so re-invoking it is the
-			// natural re-resolution path.
-			return &StreamPlan{
-				CDNURL: u, TrackID: trackID, Format: format, GainDB: gain, Encrypted: true,
-				Refresh: func() (*StreamPlan, error) { return c.PrepareStream(trackID) },
-			}, nil
+	const maxFallbackHops = 4
+	currentID := trackID
+	seen := make(map[string]bool)
+	var gain float64
+	var err error
+	for hops := 0; hops <= maxFallbackHops && currentID != "" && !seen[currentID]; hops++ {
+		seen[currentID] = true
+		var tok, fallbackID string
+		tok, gain, fallbackID, err = c.trackToken(currentID)
+		if err != nil {
+			break
 		}
-		if !errors.Is(mErr, ErrNoFullMedia) {
-			// Transient (post-retry) or other non-entitlement error: surface it
-			// instead of falling back to a preview clip.
-			return nil, mErr
+		if tok != "" {
+			var u, format string
+			u, format, err = c.resolveMediaURL(tok)
+			if err == nil {
+				return &StreamPlan{
+					CDNURL: u, TrackID: currentID, Format: format, GainDB: gain, Encrypted: true,
+					Refresh: func() (*StreamPlan, error) { return c.PrepareStream(trackID) },
+				}, nil
+			}
+			if !errors.Is(err, ErrNoFullMedia) {
+				return nil, err // never downgrade on a transient failure
+			}
+		} else {
+			err = fmt.Errorf("track %s has no media token", currentID)
 		}
-		err = mErr // entitlement rejection: allow preview fallback below
+		currentID = fallbackID
 	}
 	// Fallback: the public 30-second preview (unencrypted). Encrypted == false
 	// so the player and downloader stream it straight through, no Blowfish.

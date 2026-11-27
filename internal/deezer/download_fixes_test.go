@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -726,6 +728,38 @@ func TestPlaylists_Paginates(t *testing.T) {
 	}
 }
 
+func TestPlaylists_ArtworkPictureType(t *testing.T) {
+	c := New("dummy")
+	loggedInPremium(c)
+	c.http = &http.Client{Transport: rtFunc(func(r *http.Request) (*http.Response, error) {
+		return jsonResponse([]byte(`{"error":{},"results":{"TAB":{"playlists":{"data":[
+			{"PLAYLIST_ID":"1","TITLE":"Personal","NB_SONG":2,"PLAYLIST_PICTURE":"personal-hash","PICTURE_TYPE":"playlist"},
+			{"PLAYLIST_ID":"2","TITLE":"Album-based","NB_SONG":2,"PLAYLIST_PICTURE":"album-hash","PICTURE_TYPE":"cover"},
+			{"PLAYLIST_ID":"3","TITLE":"Legacy","NB_SONG":2,"PLAYLIST_PICTURE":"legacy-hash"},
+			{"PLAYLIST_ID":"4","TITLE":"No picture","NB_SONG":2,"PLAYLIST_PICTURE":""}
+		]}}}}`)), nil
+	})}
+
+	got, err := c.Playlists()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"https://e-cdns-images.dzcdn.net/images/playlist/personal-hash/250x250-000000-80-0-0.jpg",
+		"https://e-cdns-images.dzcdn.net/images/cover/album-hash/250x250-000000-80-0-0.jpg",
+		"https://e-cdns-images.dzcdn.net/images/playlist/legacy-hash/250x250-000000-80-0-0.jpg",
+		"",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d playlists, want %d", len(got), len(want))
+	}
+	for i, p := range got {
+		if p.ArtworkURL != want[i] {
+			t.Errorf("playlist %d artwork = %q, want %q", i, p.ArtworkURL, want[i])
+		}
+	}
+}
+
 func gwPlaylistsPage(startID, n int) []byte {
 	var sb strings.Builder
 	sb.WriteString(`{"error":{},"results":{"TAB":{"playlists":{"data":[`)
@@ -740,6 +774,89 @@ func gwPlaylistsPage(startID, n int) []byte {
 }
 
 // --- E1: PrepareStream error classification ---
+
+func TestPrepareStream_UsesDeezerFallbackForUnavailableRecording(t *testing.T) {
+	c := New("dummy")
+	loggedInPremium(c)
+	c.mu.Lock()
+	c.licenseToken = "lic-1"
+	c.userID = "1"
+	c.mu.Unlock()
+	c.restURLOverride = "http://rest.test"
+	var lookedUp, resolved []string
+	c.http = &http.Client{Transport: rtFunc(func(r *http.Request) (*http.Response, error) {
+		if strings.Contains(r.URL.RawQuery, "method=deezer.getUserData") {
+			return loginResponseForTest(), nil
+		}
+		if strings.Contains(r.URL.RawQuery, "method=song.getData") {
+			body, _ := io.ReadAll(r.Body)
+			var req struct {
+				SngID string `json:"sng_id"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil {
+				return nil, err
+			}
+			lookedUp = append(lookedUp, req.SngID)
+			if req.SngID == "510168732" {
+				return jsonResponse([]byte(`{"error":{},"results":{"TRACK_TOKEN":"old-token","GAIN":"-3","FALLBACK":{"SNG_ID":"2629694222"}}}`)), nil
+			}
+			return jsonResponse([]byte(`{"error":{},"results":{"TRACK_TOKEN":"new-token","GAIN":"-6.5"}}`)), nil
+		}
+		if r.URL.Host == "media.deezer.com" {
+			body, _ := io.ReadAll(r.Body)
+			var req struct {
+				TrackTokens []string `json:"track_tokens"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil {
+				return nil, err
+			}
+			resolved = append(resolved, req.TrackTokens[0])
+			if req.TrackTokens[0] == "old-token" {
+				return jsonResponse([]byte(`{"data":[{"errors":[{"code":2002,"message":"Track token has no sufficient rights on requested media"}]}]}`)), nil
+			}
+			return jsonResponse([]byte(`{"data":[{"media":[{"format":"MP3_128","sources":[{"url":"https://cdn/replacement"}]}]}]}`)), nil
+		}
+		return nil, fmt.Errorf("unexpected test request: %s", r.URL)
+	})}
+
+	plan, err := c.PrepareStream("510168732")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.TrackID != "2629694222" || plan.CDNURL != "https://cdn/replacement" || plan.GainDB != -6.5 || !plan.Encrypted || plan.Preview {
+		t.Fatalf("replacement plan must carry its own decryption ID and gain: %+v", plan)
+	}
+	if !reflect.DeepEqual(lookedUp, []string{"510168732", "2629694222"}) || !reflect.DeepEqual(resolved, []string{"old-token", "old-token", "new-token"}) {
+		t.Fatalf("lookedUp=%v resolved=%v", lookedUp, resolved)
+	}
+	refreshed, err := plan.Refresh()
+	if err != nil || refreshed.TrackID != "2629694222" {
+		t.Fatalf("refresh must resolve from the original library ID: plan=%+v err=%v", refreshed, err)
+	}
+}
+
+func TestPrepareStream_FallbackCycleIsBounded(t *testing.T) {
+	c := New("dummy")
+	loggedInPremium(c)
+	c.restURLOverride = "http://rest.test"
+	var calls int
+	c.http = &http.Client{Transport: rtFunc(func(r *http.Request) (*http.Response, error) {
+		if strings.Contains(r.URL.RawQuery, "method=song.getData") {
+			calls++
+			if calls == 1 {
+				return jsonResponse([]byte(`{"error":{},"results":{"FALLBACK":{"SNG_ID":"2"}}}`)), nil
+			}
+			return jsonResponse([]byte(`{"error":{},"results":{"FALLBACK":{"SNG_ID":"1"}}}`)), nil
+		}
+		if strings.HasPrefix(r.URL.Path, "/track/") {
+			return jsonResponse([]byte(`{"preview":""}`)), nil
+		}
+		return nil, fmt.Errorf("unexpected test request: %s", r.URL)
+	})}
+	if _, err := c.PrepareStream("1"); err == nil || calls != 2 {
+		t.Fatalf("cyclic fallback must stop after two unique IDs; calls=%d err=%v", calls, err)
+	}
+}
 
 func TestPrepareStream_Transient5xxRetried_NoPreviewFallback(t *testing.T) {
 	mediaCalls := 0

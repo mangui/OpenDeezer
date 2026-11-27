@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="family_profiles_title">Deezer Family profiles</string>
+    <string name="family_current"> (current)</string>
+    <string name="family_switch_error">Could not switch profile. The previous profile is still active.</string>
     <string name="app_name">OpenDeezer</string>
 
     <!-- Brand / product tokens: same in every language -->
@@ -22,6 +25,7 @@
     <string name="action_next">Next</string>
     <string name="action_previous">Previous</string>
     <string name="action_play_all">Play all</string>
+    <string name="action_shuffle_play">Shuffle play</string>
     <string name="action_login">Log in</string>
     <string name="common_enable">Enable</string>
     <string name="common_off">Off</string>
@@ -75,6 +79,10 @@
     <string name="greeting_afternoon">Good afternoon</string>
     <string name="greeting_evening">Good evening</string>
     <string name="greeting_named">%1$s, %2$s</string>
+    <string name="home_subtitle">Your music, ready when you are.</string>
+    <string name="home_see_all">See all</string>
+    <string name="shuffle_on">Shuffle on</string>
+    <string name="shuffle_off">Shuffle off</string>
     <string name="home_liked">Liked Songs</string>
     <string name="section_top_tracks">Top Tracks</string>
     <string name="section_your_playlists">Your Playlists</string>
@@ -191,6 +199,7 @@
     <string name="download_failed">Download failed: %1$s</string>
     <string name="download_failed_generic">Download failed</string>
     <string name="favorite_update_failed">Couldn\'t update Like — check your connection.</string>
+    <string name="playback_start_failed">Couldn\'t play “%1$s”. The previous track was kept.</string>
     <string name="preview_chip">Preview</string>
     <string name="account_free_hint">Free account · standard quality (128 kbps)</string>
 
@@ -299,7 +308,9 @@
     </plurals>
     <!-- Queue editor + download for offline -->
     <string name="action_play_next">Play next</string>
-    <string name="action_add_to_queue">Add to queue</string>
+    <string name="action_add_to_queue">Add to end of queue</string>
+    <string name="queue_added_next">Up next: %1$s</string>
+    <string name="queue_added_last">Added to end: %1$s</string>
     <string name="action_clear_queue">Clear queue</string>
     <string name="action_download_offline">Download for offline</string>
     <string name="action_remove">Remove</string>

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,10 +24,12 @@ import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.Explicit
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import fr.cyclooo.opendeezer.R
@@ -96,7 +100,7 @@ fun Artwork(
 
 /**
  * Convenience [TrackRow] wired to a [PlayerController]: fills in the standard
- * long-press menu (Play next / Add to queue / Download / Download for offline)
+ * visible overflow / long-press menu (Play next / Add to end / downloads)
  * and the "downloaded" badge from the player's premium flag + offline-id set, so
  * browse/list screens get the full queue + download affordances with one call.
  * [onStartRadio] and [trailing] stay caller-supplied.
@@ -131,7 +135,8 @@ fun TrackRow(
  * A track list row. Tapping runs [onClick]; when any menu callback
  * ([onPlayNext], [onAddToQueue], [onDownload], [onDownloadOffline],
  * [onStartRadio]) is supplied the row also responds to a long-press with a
- * context menu. The Download items are enabled only when their *_Enabled flag is
+ * context menu; a visible overflow button makes those actions discoverable.
+ * The Download items are enabled only when their *_Enabled flag is
  * set (premium), otherwise shown disabled with a hint — downloads are premium-
  * only. [offlineDownloaded] renders a "downloaded" badge for cache-available
  * tracks. [onStartRadio] seeds a "song radio" from this track.
@@ -221,86 +226,71 @@ fun TrackRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        if (hasMenu) {
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                if (onPlayNext != null) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_play_next)) },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onPlayNext()
-                        },
-                    )
-                }
-                if (onAddToQueue != null) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_add_to_queue)) },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onAddToQueue()
-                        },
-                    )
-                }
-                if (onStartRadio != null) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_start_radio)) },
-                        leadingIcon = { Icon(Icons.Filled.Radio, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onStartRadio()
-                        },
-                    )
-                }
-                if (onDownloadOffline != null) {
-                    DropdownMenuItem(
-                        text = {
-                            if (downloadOfflineEnabled) {
-                                Text(stringResource(R.string.action_download_offline))
-                            } else {
-                                Column {
-                                    Text(stringResource(R.string.action_download_offline))
-                                    Text(
-                                        stringResource(R.string.download_requires_premium),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        },
-                        leadingIcon = { Icon(Icons.Filled.DownloadForOffline, contentDescription = null) },
-                        enabled = downloadOfflineEnabled,
-                        onClick = {
-                            menuOpen = false
-                            onDownloadOffline()
-                        },
-                    )
-                }
-                if (onDownload != null) {
-                    DropdownMenuItem(
-                        text = {
-                            if (downloadEnabled) {
-                                Text(stringResource(R.string.action_download))
-                            } else {
-                                Column {
-                                    Text(stringResource(R.string.action_download))
-                                    Text(
-                                        stringResource(R.string.download_requires_premium),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        },
-                        leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
-                        enabled = downloadEnabled,
-                        onClick = {
-                            menuOpen = false
-                            onDownload()
-                        },
-                    )
+            if (hasMenu) {
+                Spacer(Modifier.width(4.dp))
+                Box {
+                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.cd_more))
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        if (onPlayNext != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_play_next)) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null) },
+                                onClick = { menuOpen = false; onPlayNext() },
+                            )
+                        }
+                        if (onAddToQueue != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_add_to_queue)) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
+                                onClick = { menuOpen = false; onAddToQueue() },
+                            )
+                        }
+                        if (onStartRadio != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_start_radio)) },
+                                leadingIcon = { Icon(Icons.Filled.Radio, contentDescription = null) },
+                                onClick = { menuOpen = false; onStartRadio() },
+                            )
+                        }
+                        if (onDownloadOffline != null) {
+                            DropdownMenuItem(
+                                text = {
+                                    if (downloadOfflineEnabled) Text(stringResource(R.string.action_download_offline))
+                                    else Column {
+                                        Text(stringResource(R.string.action_download_offline))
+                                        Text(
+                                            stringResource(R.string.download_requires_premium),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Filled.DownloadForOffline, contentDescription = null) },
+                                enabled = downloadOfflineEnabled,
+                                onClick = { menuOpen = false; onDownloadOffline() },
+                            )
+                        }
+                        if (onDownload != null) {
+                            DropdownMenuItem(
+                                text = {
+                                    if (downloadEnabled) Text(stringResource(R.string.action_download))
+                                    else Column {
+                                        Text(stringResource(R.string.action_download))
+                                        Text(
+                                            stringResource(R.string.download_requires_premium),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
+                                enabled = downloadEnabled,
+                                onClick = { menuOpen = false; onDownload() },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -318,20 +308,21 @@ fun MediaCard(
 ) {
     Column(
         modifier
-            .width(150.dp)
+            .width(184.dp)
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(horizontal = 5.dp, vertical = 8.dp),
     ) {
         Artwork(
             artworkUrl,
             Modifier.fillMaxWidth().aspectRatio(1f),
-            corner = if (round) 75 else 8,
+            corner = if (round) 92 else 14,
         )
-        Spacer(Modifier.padding(top = 6.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             title.ifBlank { stringResource(R.string.unknown_title) },
             style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (subtitle.isNotBlank()) {
@@ -350,9 +341,9 @@ fun MediaCard(
 fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleLarge,
         color = MaterialTheme.colorScheme.onBackground,
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.padding(horizontal = 24.dp, vertical = 10.dp),
     )
 }
 

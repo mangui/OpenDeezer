@@ -27,6 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import fr.cyclooo.opendeezer.engine.Engine
+import fr.cyclooo.opendeezer.engine.Playlist
 import fr.cyclooo.opendeezer.ui.LocalFoldState
 import fr.cyclooo.opendeezer.ui.components.PlayerBar
 import fr.cyclooo.opendeezer.ui.components.UpdateBanner
@@ -86,10 +87,15 @@ private fun MainScaffold(vm: AppViewModel) {
     val player = vm.player
     val playerState by player.state.collectAsState()
     var showConnect by remember { mutableStateOf(false) }
+    var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
     fun nav(route: String) = navController.navigate(route)
+    fun openPlaylist(playlist: Playlist) {
+        selectedPlaylist = playlist
+        nav(Routes.playlist(playlist.id, playlist.name))
+    }
     val back: () -> Unit = { navController.popBackStack() }
 
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -135,6 +141,21 @@ private fun MainScaffold(vm: AppViewModel) {
         }
     }
 
+    LaunchedEffect(player) {
+        player.playbackFailures.collect { trackName ->
+            snackbarHostState.currentSnackbarData?.dismiss()
+            launch { snackbarHostState.showSnackbar(context.getString(R.string.playback_start_failed, trackName)) }
+        }
+    }
+
+    LaunchedEffect(player) {
+        player.queueNotices.collect { notice ->
+            val label = if (notice.next) R.string.queue_added_next else R.string.queue_added_last
+            snackbarHostState.currentSnackbarData?.dismiss()
+            launch { snackbarHostState.showSnackbar(context.getString(label, notice.trackName)) }
+        }
+    }
+
     Scaffold(
         // Inner screen Scaffolds manage system-bar insets; this outer one only
         // contributes the bottom player bar so the top inset isn't applied twice.
@@ -148,6 +169,7 @@ private fun MainScaffold(vm: AppViewModel) {
                     onToggle = player::togglePause,
                     onNext = player::next,
                     onPrev = player::prev,
+                    onShuffle = { player.setShuffle(!playerState.shuffle) },
                 )
             }
         },
@@ -159,13 +181,19 @@ private fun MainScaffold(vm: AppViewModel) {
         ) {
             composable(Routes.HOME) {
                 HomeScreen(
+                    accountId = vm.account?.userId.orEmpty(),
                     accountName = vm.account?.name.orEmpty(),
+                    familyProfiles = vm.familyProfiles,
+                    familyBusy = vm.familyBusy,
+                    familyError = vm.familyError,
                     connected = playerState.connectedDevice.isNotBlank(),
                     player = player,
                     onNavigate = { nav(it) },
-                    onPlaylist = { nav(Routes.playlist(it.id, it.name)) },
+                    onPlaylist = ::openPlaylist,
                     onCast = { showConnect = true },
                     onSettings = { nav(Routes.SETTINGS) },
+                    onLoadFamilyProfiles = vm::loadFamilyProfiles,
+                    onSelectFamilyProfile = vm::selectFamilyProfile,
                 )
             }
             composable(Routes.LIKED) {
@@ -188,7 +216,7 @@ private fun MainScaffold(vm: AppViewModel) {
                 if (fold.isBook && hinge != null) {
                     PlaylistsBookScreen(player = player, hingeBounds = hinge, onBack = back)
                 } else {
-                    PlaylistsScreen(onBack = back, onOpen = { nav(Routes.playlist(it.id, it.name)) })
+                    PlaylistsScreen(onBack = back, onOpen = ::openPlaylist)
                 }
             }
             composable(Routes.PLAYLIST) { entry ->
@@ -196,6 +224,7 @@ private fun MainScaffold(vm: AppViewModel) {
                 val name = entry.arguments?.getString("name").orEmpty()
                 TrackListScreen(
                     title = name,
+                    playlist = selectedPlaylist?.takeIf { it.id == id },
                     player = player,
                     onBack = back,
                     onBulkDownload = { player.downloadPlaylist(id, name) },
@@ -231,7 +260,7 @@ private fun MainScaffold(vm: AppViewModel) {
                     onBack = back,
                     onAlbum = { nav(Routes.album(it.id, it.name)) },
                     onArtist = { nav(Routes.artist(it.id, it.name)) },
-                    onPlaylist = { nav(Routes.playlist(it.id, it.name)) },
+                    onPlaylist = ::openPlaylist,
                 )
             }
             composable(Routes.SEARCH) {
@@ -240,7 +269,7 @@ private fun MainScaffold(vm: AppViewModel) {
                     onBack = back,
                     onAlbum = { nav(Routes.album(it.id, it.name)) },
                     onArtist = { nav(Routes.artist(it.id, it.name)) },
-                    onPlaylist = { nav(Routes.playlist(it.id, it.name)) },
+                    onPlaylist = ::openPlaylist,
                 )
             }
             composable(Routes.PODCASTS) {
@@ -270,6 +299,11 @@ private fun MainScaffold(vm: AppViewModel) {
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     account = vm.account,
+                    familyProfiles = vm.familyProfiles,
+                    familyBusy = vm.familyBusy,
+                    familyError = vm.familyError,
+                    onLoadFamilyProfiles = vm::loadFamilyProfiles,
+                    onSelectFamilyProfile = vm::selectFamilyProfile,
                     onBack = back,
                     onEqualizer = { nav(Routes.EQUALIZER) },
                     onLogout = vm::logout,

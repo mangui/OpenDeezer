@@ -26,6 +26,16 @@ func resetEngineQueue() {
 	queueMu.Unlock()
 }
 
+func TestPendingMetaKeepsFallbackMediaID(t *testing.T) {
+	storePendingMeta("old-library-id", &deezer.StreamPlan{
+		TrackID: "new-media-id", Format: "MP3_128", Encrypted: true,
+	})
+	m, ok := takePendingMeta("old-library-id")
+	if !ok || m.mediaID != "new-media-id" || m.meta.Format != "MP3_128" {
+		t.Fatalf("fallback cache metadata must target the decrypted media ID: %+v ok=%v", m, ok)
+	}
+}
+
 // TestSetQueueJSONReflectsInEngineState proves an app queue synced via
 // SetQueueJSON/SetQueueIndex shows up on /status (State.Queue) with the cursor
 // where the app put it — previously engineState never reported a queue.
