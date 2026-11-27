@@ -78,6 +78,8 @@
     <string name="greeting_afternoon">Good afternoon</string>
     <string name="greeting_evening">Good evening</string>
     <string name="greeting_named">%1$s, %2$s</string>
+    <string name="home_subtitle">Your music, ready when you are.</string>
+    <string name="home_see_all">See all</string>
     <string name="home_liked">Liked Songs</string>
     <string name="section_top_tracks">Top Tracks</string>
     <string name="section_your_playlists">Your Playlists</string>

@@ -2,6 +2,7 @@ package fr.cyclooo.opendeezer.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -151,23 +152,43 @@ fun NowPlayingScreen(
                 },
             )
         } else {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Artwork(
-                    track.artworkUrl,
-                    Modifier.widthIn(max = 480.dp).fillMaxWidth().aspectRatio(1f),
-                    corner = 16,
-                )
-                Spacer(Modifier.height(24.dp))
-                TrackInfo(track, state)
-                Spacer(Modifier.height(16.dp))
-                PlayerControls(state, player, track, onLyrics)
+            BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+                if (maxWidth >= 720.dp && maxHeight >= 360.dp) {
+                    // Portal Go / landscape tablet: artwork and controls live
+                    // side by side, with transport visible without scrolling.
+                    val coverSize = minOf(maxWidth * 0.42f, maxHeight - 32.dp, 420.dp)
+                    Row(
+                        Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(32.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Artwork(track.artworkUrl, Modifier.size(coverSize), corner = 20)
+                        Column(
+                            Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            TrackInfo(track, state)
+                            Spacer(Modifier.height(16.dp))
+                            PlayerControls(state, player, track, onLyrics)
+                        }
+                    }
+                } else {
+                    Column(
+                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Artwork(
+                            track.artworkUrl,
+                            Modifier.widthIn(max = 480.dp).fillMaxWidth().aspectRatio(1f),
+                            corner = 16,
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        TrackInfo(track, state)
+                        Spacer(Modifier.height(16.dp))
+                        PlayerControls(state, player, track, onLyrics)
+                    }
+                }
             }
         }
     }

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,51 +47,57 @@ fun PlayerBar(
     } else 0f
 
     Surface(
-        tonalElevation = 3.dp,
+        tonalElevation = 5.dp,
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column {
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(3.dp),
                 color = MaterialTheme.colorScheme.primary,
             )
             Row(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .clickable(onClick = onOpen)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .heightIn(min = 80.dp)
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Artwork(track.artworkUrl, Modifier.size(44.dp), corner = 6)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        track.name.ifBlank { stringResource(R.string.unknown_title) },
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val sub = track.artistLine.ifBlank { track.albumName }
-                    if (sub.isNotBlank()) {
+                Row(
+                    Modifier.weight(1f).clickable(onClick = onOpen),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Artwork(track.artworkUrl, Modifier.size(56.dp), corner = 10)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            sub,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            track.name.ifBlank { stringResource(R.string.unknown_title) },
+                            style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        val sub = track.artistLine.ifBlank { track.albumName }
+                        if (sub.isNotBlank()) {
+                            Text(
+                                sub,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
                 IconButton(onClick = onPrev, enabled = state.hasPrev) {
                     Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.action_previous))
                 }
-                IconButton(onClick = onToggle) {
+                FilledIconButton(onClick = onToggle, modifier = Modifier.size(48.dp)) {
                     Icon(
                         if (state.state == Engine.PLAYING) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = stringResource(R.string.cd_play_pause),
+                        modifier = Modifier.size(28.dp),
                     )
                 }
                 IconButton(onClick = onNext, enabled = state.hasNext) {

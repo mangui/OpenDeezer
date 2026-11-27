@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import fr.cyclooo.opendeezer.R
@@ -318,20 +320,21 @@ fun MediaCard(
 ) {
     Column(
         modifier
-            .width(150.dp)
+            .width(184.dp)
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(horizontal = 5.dp, vertical = 8.dp),
     ) {
         Artwork(
             artworkUrl,
             Modifier.fillMaxWidth().aspectRatio(1f),
-            corner = if (round) 75 else 8,
+            corner = if (round) 92 else 14,
         )
-        Spacer(Modifier.padding(top = 6.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             title.ifBlank { stringResource(R.string.unknown_title) },
             style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (subtitle.isNotBlank()) {
@@ -350,9 +353,9 @@ fun MediaCard(
 fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleLarge,
         color = MaterialTheme.colorScheme.onBackground,
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.padding(horizontal = 24.dp, vertical = 10.dp),
     )
 }
 
