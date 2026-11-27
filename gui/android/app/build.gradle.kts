@@ -11,6 +11,14 @@ val upstreamUpdatesEnabled = providers.gradleProperty("upstreamUpdates")
     ?.toBooleanStrictOrNull()
     ?: true
 
+// Dedicated Portal Go builds use one permanent package ID and an explicit
+// monotonically increasing version code, independent of upstream releases.
+val portalBuild = providers.gradleProperty("portalBuild").orNull == "true"
+val portalVersionCode = providers.gradleProperty("portalVersionCode").orNull?.toIntOrNull()
+if (portalBuild && (portalVersionCode == null || portalVersionCode !in 1..209_999_999)) {
+    throw GradleException("portalBuild requires -PportalVersionCode=1..209999999")
+}
+
 // Keep this order in sync with F-Droid's VercodeOperation entries. Compatible
 // devices can accept more than one ABI, so the preferred ABI needs the larger
 // version code. The base versionCode remains the release counter that tooling
@@ -41,7 +49,7 @@ android {
         applicationId = "fr.cyclooo.opendeezer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 26
+        versionCode = if (portalBuild) portalVersionCode!! else 26
         versionName = "3.1.4"
         buildConfigField("boolean", "ENABLE_UPSTREAM_UPDATES", upstreamUpdatesEnabled.toString())
     }
@@ -109,6 +117,10 @@ android {
     productFlavors {
         create("mobile") {
             dimension = "device"
+            if (portalBuild) {
+                applicationIdSuffix = ".familyportal"
+                versionNameSuffix = "-familyportal.$portalVersionCode"
+            }
         }
         create("tv") {
             dimension = "device"

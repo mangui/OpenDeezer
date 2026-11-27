@@ -3,3 +3,8 @@
 /opendeezer.exe
 *.test
 hs_err_pid*.log
+
+# Private Android signing material must never enter Git.
+*.p12
+*.jks
+*.keystore
