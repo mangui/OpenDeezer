@@ -43,6 +43,14 @@ object Engine {
         Json.account(runCatching { Odmobile.account() }.getOrNull())
     }
 
+    suspend fun familyProfiles(): List<FamilyProfile> = io {
+        Json.familyProfiles(runCatching { Odmobile.profilesJSON() }.getOrNull())
+    }
+
+    suspend fun switchProfile(id: String): Account? = io {
+        Json.account(runCatching { Odmobile.switchProfile(id) }.getOrNull())
+    }
+
     fun setClientInfo(client: String, device: String) {
         runCatching { Odmobile.setClientInfo(client, device) }
     }

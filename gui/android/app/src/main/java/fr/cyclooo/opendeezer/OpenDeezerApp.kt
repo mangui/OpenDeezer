@@ -270,6 +270,11 @@ private fun MainScaffold(vm: AppViewModel) {
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     account = vm.account,
+                    familyProfiles = vm.familyProfiles,
+                    familyBusy = vm.familyBusy,
+                    familyError = vm.familyError,
+                    onLoadFamilyProfiles = vm::loadFamilyProfiles,
+                    onSelectFamilyProfile = vm::selectFamilyProfile,
                     onBack = back,
                     onEqualizer = { nav(Routes.EQUALIZER) },
                     onLogout = vm::logout,

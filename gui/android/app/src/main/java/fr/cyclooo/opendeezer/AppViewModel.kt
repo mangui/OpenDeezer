@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import fr.cyclooo.opendeezer.data.Prefs
 import fr.cyclooo.opendeezer.engine.Account
 import fr.cyclooo.opendeezer.engine.Engine
+import fr.cyclooo.opendeezer.engine.FamilyProfile
 import fr.cyclooo.opendeezer.engine.UpdateInfo
 import fr.cyclooo.opendeezer.player.PlaybackService
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var busy by mutableStateOf(false)
         private set
     var updateInfo by mutableStateOf<UpdateInfo?>(null)
+        private set
+    var familyProfiles by mutableStateOf<List<FamilyProfile>>(emptyList())
+        private set
+    var familyBusy by mutableStateOf(false)
+        private set
+    var familyError by mutableStateOf(false)
         private set
 
     // The last ARL that failed Engine.init — the WebView auto-capture must not
@@ -174,6 +181,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun loadFamilyProfiles() {
+        if (familyBusy || stage != AuthStage.READY) return
+        familyBusy = true
+        familyError = false
+        viewModelScope.launch {
+            familyProfiles = Engine.familyProfiles()
+            familyBusy = false
+        }
+    }
+
+    fun selectFamilyProfile(id: String) {
+        if (familyBusy) return
+        familyBusy = true
+        familyError = false
+        viewModelScope.launch {
+            player.stopPlayback()
+            val selected = Engine.switchProfile(id)
+            if (selected?.loggedIn == true) {
+                account = selected
+                player.refreshLikedIds()
+            } else {
+                familyError = true
+            }
+            familyBusy = false
+        }
+    }
+
     /**
      * Re-attempts sign-in with the saved ARL. Backs the No-Internet screen's
      * Retry button — reuses the exact launch path, so a recovered connection
@@ -214,6 +248,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun logout() {
+        familyProfiles = emptyList()
+        familyError = false
         player.stop()
         player.stopPlayback()
         // Stop serving/advertising for the signed-out account: the Connect host

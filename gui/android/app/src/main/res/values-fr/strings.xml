@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="family_profiles_title">Profils Deezer Famille</string>
+    <string name="family_current"> (actuel)</string>
+    <string name="family_switch_error">Changement impossible. Le profil précédent reste actif.</string>
     <string name="app_name">OpenDeezer</string>
 
     <string name="action_back">Retour</string>

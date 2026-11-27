@@ -90,6 +90,8 @@ data class Account(
     val loggedIn: Boolean,
 )
 
+data class FamilyProfile(val userId: String, val name: String, val isAdmin: Boolean)
+
 data class LyricLine(val timeMs: Long, val text: String)
 
 data class Lyrics(val plain: String, val lines: List<LyricLine>) {
@@ -410,6 +412,15 @@ object Json {
             premium = o.optBoolean("premium"),
             loggedIn = o.optBoolean("loggedIn"),
         )
+    }
+
+    fun familyProfiles(s: String?): List<FamilyProfile> {
+        val array = runCatching { JSONArray(s) }.getOrNull() ?: return emptyList()
+        return (0 until array.length()).mapNotNull { i ->
+            array.optJSONObject(i)?.let {
+                FamilyProfile(it.optString("userId"), it.optString("name"), it.optBoolean("isAdmin"))
+            }
+        }
     }
 
     fun nowPlaying(s: String?): Track? {

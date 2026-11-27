@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="family_profiles_title">Deezer Family profiles</string>
+    <string name="family_current"> (current)</string>
+    <string name="family_switch_error">Could not switch profile. The previous profile is still active.</string>
     <string name="app_name">OpenDeezer</string>
 
     <!-- Brand / product tokens: same in every language -->

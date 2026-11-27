@@ -12,6 +12,7 @@ package odmobile
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -319,7 +320,15 @@ func Init(arl string) bool {
 	mu.Unlock()
 
 	c := deezer.New(arl)
-	if err := c.Login(); err != nil {
+	if err := c.SetProfileID(config.LoadProfileID()); err != nil {
+		_ = config.SaveProfileID("")
+	}
+	err := c.Login()
+	if errors.Is(err, deezer.ErrProfileUnavailable) {
+		_ = config.SaveProfileID("")
+		err = nil // the default profile is still logged in
+	}
+	if err != nil {
 		atomic.StoreInt32(&lastLoginKind, loginKind(err))
 		odlog.Warn("login failed: %v", err)
 		return false
@@ -374,6 +383,26 @@ func Account() string {
 	}
 	return jstr(c.Account(), nil)
 }
+
+// ProfilesJSON lists the switchable Deezer Family profiles.
+func ProfilesJSON() string {
+	return withClient(func(c *deezer.Client) (any, error) { return c.Profiles() })
+}
+
+// SwitchProfile rebinds the current Deezer session to a Family member.
+func SwitchProfile(id string) string {
+	return withClient(func(c *deezer.Client) (any, error) {
+		if err := c.SwitchProfile(id); err != nil {
+			return nil, err
+		}
+		if err := config.SaveProfileID(id); err != nil {
+			odlog.Warn("save Family profile: %v", err)
+		}
+		refreshControlServer(c)
+		return c.Account(), nil
+	})
+}
+
 func UserID() string {
 	if c := curClient(); c != nil {
 		return c.UserID()
@@ -2922,6 +2951,7 @@ func SetEQJSON(js string) bool {
 // same-account auth), stops Connect-host advertising, and forgets the Deezer
 // client. A later Init starts services fresh for the new account.
 func Logout() {
+	_ = config.SaveProfileID("")
 	// Clear ALL remote-routing state first (B8): remoteCli/remoteSt/remoteAddr/
 	// remoteStop must not survive the session wipe, or commands would keep routing
 	// to the old device under the next account. DisconnectDevice also halts the
