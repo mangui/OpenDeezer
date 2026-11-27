@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.CastConnected
@@ -31,6 +34,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,10 +43,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -53,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import fr.cyclooo.opendeezer.R
 import fr.cyclooo.opendeezer.Routes
 import fr.cyclooo.opendeezer.engine.Engine
+import fr.cyclooo.opendeezer.engine.FamilyProfile
 import fr.cyclooo.opendeezer.engine.HomeData
 import fr.cyclooo.opendeezer.engine.Playlist
 import fr.cyclooo.opendeezer.player.PlayerController
@@ -67,15 +78,25 @@ private data class QuickPick(val label: String, val icon: ImageVector, val route
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    accountId: String,
     accountName: String,
+    familyProfiles: List<FamilyProfile>,
+    familyBusy: Boolean,
+    familyError: Boolean,
     connected: Boolean,
     player: PlayerController,
     onNavigate: (String) -> Unit,
     onPlaylist: (Playlist) -> Unit,
     onCast: () -> Unit,
     onSettings: () -> Unit,
+    onLoadFamilyProfiles: () -> Unit,
+    onSelectFamilyProfile: (String) -> Unit,
 ) {
-    val homeData by produceState<HomeData?>(initialValue = null) {
+    var showProfiles by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { onLoadFamilyProfiles() }
+    LaunchedEffect(accountId) { showProfiles = false }
+    val homeData by produceState<HomeData?>(initialValue = null, key1 = accountId) {
+        value = null
         value = Engine.home()
     }
 
@@ -103,6 +124,35 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name), color = DeezerPurple) },
                 actions = {
+                    if (familyProfiles.size > 1) {
+                        Box {
+                            TextButton(onClick = { showProfiles = true }) {
+                                Icon(Icons.Filled.AccountCircle, contentDescription = null)
+                                Text(
+                                    accountName,
+                                    modifier = Modifier.widthIn(max = 120.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                            }
+                            DropdownMenu(expanded = showProfiles, onDismissRequest = { showProfiles = false }) {
+                                familyProfiles.forEach { member ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(member.name + if (member.userId == accountId) stringResource(R.string.family_current) else "")
+                                        },
+                                        onClick = { onSelectFamilyProfile(if (member.isAdmin) "" else member.userId) },
+                                        enabled = !familyBusy && member.userId != accountId,
+                                    )
+                                }
+                                if (familyBusy) CircularProgressIndicator(Modifier.size(24.dp))
+                                if (familyError) {
+                                    Text(stringResource(R.string.family_switch_error), color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
                     IconButton(onClick = { onNavigate(Routes.HISTORY) }) {
                         Icon(Icons.Filled.History, contentDescription = stringResource(R.string.history_title))
                     }

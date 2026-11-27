@@ -159,13 +159,19 @@ private fun MainScaffold(vm: AppViewModel) {
         ) {
             composable(Routes.HOME) {
                 HomeScreen(
+                    accountId = vm.account?.userId.orEmpty(),
                     accountName = vm.account?.name.orEmpty(),
+                    familyProfiles = vm.familyProfiles,
+                    familyBusy = vm.familyBusy,
+                    familyError = vm.familyError,
                     connected = playerState.connectedDevice.isNotBlank(),
                     player = player,
                     onNavigate = { nav(it) },
                     onPlaylist = { nav(Routes.playlist(it.id, it.name)) },
                     onCast = { showConnect = true },
                     onSettings = { nav(Routes.SETTINGS) },
+                    onLoadFamilyProfiles = vm::loadFamilyProfiles,
+                    onSelectFamilyProfile = vm::selectFamilyProfile,
                 )
             }
             composable(Routes.LIKED) {
