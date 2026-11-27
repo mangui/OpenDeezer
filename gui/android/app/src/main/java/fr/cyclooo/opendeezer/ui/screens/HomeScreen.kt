@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BarChart
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.Search
@@ -106,10 +109,12 @@ private fun QuickPickCard(pick: QuickPick, modifier: Modifier, onNavigate: (Stri
 @Composable
 private fun TopTrackCard(
     track: Track,
+    player: PlayerController,
     modifier: Modifier = Modifier.width(290.dp).height(88.dp),
     compact: Boolean = false,
     onClick: () -> Unit,
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     Surface(
         onClick = onClick,
         modifier = modifier,
@@ -138,7 +143,23 @@ private fun TopTrackCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = DeezerPurple, modifier = Modifier.size(25.dp))
+            Box {
+                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.cd_more))
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_play_next)) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null) },
+                        onClick = { menuOpen = false; player.playNext(track) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_add_to_queue)) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
+                        onClick = { menuOpen = false; player.addToQueue(track) },
+                    )
+                }
+            }
         }
     }
 }
@@ -392,6 +413,7 @@ fun HomeScreen(
                                 data.topTracks.take(4).forEachIndexed { index, track ->
                                     TopTrackCard(
                                         track = track,
+                                        player = player,
                                         modifier = Modifier.fillMaxWidth().height(64.dp),
                                         compact = true,
                                     ) { player.playQueue(data.topTracks, index) }
@@ -450,7 +472,7 @@ fun HomeScreen(
                                 data.topTracks,
                                 key = { i, t -> "ht-$i-${t.id}" },
                             ) { index, track ->
-                                TopTrackCard(track) { player.playQueue(data.topTracks, index) }
+                                TopTrackCard(track, player) { player.playQueue(data.topTracks, index) }
                             }
                         }
                     }

@@ -79,6 +79,9 @@ sealed interface DownloadEvent {
     ) : DownloadEvent
 }
 
+/** Confirmation that a user-requested track was queued without interrupting playback. */
+data class QueueNotice(val trackName: String, val next: Boolean)
+
 /**
  * Owns the in-app play queue and a ~500ms poll loop that mirrors the engine's
  * playback state into a [StateFlow]. It watches `finishedCount` to auto-advance,
@@ -101,6 +104,11 @@ class PlayerController(private val scope: CoroutineScope) {
 
     private var queue: List<Track> = emptyList()
     private var index: Int = -1
+    // Explicit "Play next" entries override shuffle until they have been played.
+    // Multiple requests form a block directly after the current track (newest first).
+    private var pendingNextCount: Int = 0
+    private val _queueNotices = MutableSharedFlow<QueueNotice>(extraBufferCapacity = 8)
+    val queueNotices: SharedFlow<QueueNotice> = _queueNotices.asSharedFlow()
     private var lastFinished: Int = Engine.finishedCount()
     private var pollJob: Job? = null
     private var repeatMode: Int = 0       // 0=off, 1=all, 2=one
@@ -179,6 +187,7 @@ class PlayerController(private val scope: CoroutineScope) {
         if (tracks.isEmpty()) return
         queue = tracks
         index = startIndex.coerceIn(0, tracks.lastIndex)
+        pendingNextCount = 0
         startCurrent()
     }
 
@@ -186,6 +195,7 @@ class PlayerController(private val scope: CoroutineScope) {
 
     /** Plays [track], appending it after the current item if a queue exists. */
     fun playNow(track: Track) {
+        pendingNextCount = 0
         if (queue.isEmpty()) {
             playSingle(track)
         } else {
@@ -294,6 +304,7 @@ class PlayerController(private val scope: CoroutineScope) {
     // deliberate skip. null means "nowhere to go".
     private fun manualNextIndex(): Int? = when {
         queue.isEmpty() -> null
+        pendingNextCount > 0 && index < queue.lastIndex -> index + 1
         shuffleEnabled && queue.size > 1 -> queue.indices.filter { it != index }.random()
         index < queue.lastIndex -> index + 1
         repeatMode == 1 -> 0
@@ -313,6 +324,7 @@ class PlayerController(private val scope: CoroutineScope) {
 
     fun next() {
         val target = manualNextIndex() ?: return
+        if (pendingNextCount > 0 && target == index + 1) pendingNextCount--
         index = target
         startCurrent()
     }
@@ -329,6 +341,7 @@ class PlayerController(private val scope: CoroutineScope) {
         if (target == null) {
             control { Engine.seek(0) }
         } else {
+            pendingNextCount = 0
             index = target
             startCurrent()
         }
@@ -336,17 +349,15 @@ class PlayerController(private val scope: CoroutineScope) {
 
     fun jumpTo(i: Int) {
         if (i in queue.indices) {
+            pendingNextCount = 0
             index = i
             startCurrent()
         }
     }
 
-    // ---- queue editing (P4 native queue editor) ----
-    // These mutate the ENGINE queue via the edit exports rather than the local
-    // list; each bumps QueueVersion, which the poll's adoptEngineQueueIfChanged
-    // pulls back in to re-sync `queue`/`index` + the UI. Keeping the engine as the
-    // single source of truth means remote controllers stay consistent and the
-    // cursor/history follow moves + removes engine-side.
+    // ---- queue editing ----
+    // Remote reorder/remove operations are adopted from the engine on the next
+    // poll. Local insertions mirror immediately so playback and the UI agree.
 
     /** Reorders the queue (from -> to). from==to and out-of-range are no-ops. */
     fun moveInQueue(from: Int, to: Int) {
@@ -359,10 +370,18 @@ class PlayerController(private val scope: CoroutineScope) {
         scope.launch { Engine.queueRemove(i) }
     }
 
-    /** Inserts [track] immediately after the current row (keeps playing). */
+    /** Queues [track] next, even under shuffle (keeps current audio playing). */
     fun playNext(track: Track) {
-        val json = queueJson(listOf(track))
-        scope.launch { Engine.queueInsertNext(json) }
+        if (queue.isEmpty()) {
+            playSingle(track)
+            return
+        }
+        val at = (index + 1).coerceIn(0, queue.size)
+        queue = queue.toMutableList().apply { add(at, track) }
+        pendingNextCount++
+        _queueNotices.tryEmit(QueueNotice(track.name, next = true))
+        reconcilePreload()
+        pushImmediate()
     }
 
     /**
@@ -377,6 +396,8 @@ class PlayerController(private val scope: CoroutineScope) {
             return
         }
         queue = queue + track
+        _queueNotices.tryEmit(QueueNotice(track.name, next = false))
+        reconcilePreload()
         pushImmediate()
     }
 
@@ -396,6 +417,7 @@ class PlayerController(private val scope: CoroutineScope) {
     fun stopPlayback() {
         queue = emptyList()
         index = -1
+        pendingNextCount = 0
         preloadedId = null
         control { Engine.stop() }
         scope.launch { Engine.clearPreload() }
@@ -491,6 +513,7 @@ class PlayerController(private val scope: CoroutineScope) {
                 if (!started) {
                     queue = playingQueue
                     index = playingIndex
+                    pendingNextCount = 0
                     _playbackFailures.tryEmit(t.name)
                 }
                 // Baseline on both success and failure so the old track's
@@ -515,7 +538,9 @@ class PlayerController(private val scope: CoroutineScope) {
     // naturally, or null when it isn't knowable up front (shuffle, repeat-one,
     // end of queue without repeat-all).
     private fun deterministicNextIndex(): Int? = when {
-        queue.isEmpty() || shuffleEnabled || repeatMode == 2 -> null
+        queue.isEmpty() -> null
+        pendingNextCount > 0 && index < queue.lastIndex -> index + 1
+        shuffleEnabled || repeatMode == 2 -> null
         index < queue.lastIndex -> index + 1
         repeatMode == 1 -> 0
         else -> null
@@ -589,6 +614,7 @@ class PlayerController(private val scope: CoroutineScope) {
         val newIndex = snap.index.coerceIn(0, snap.tracks.lastIndex)
         queue = snap.tracks
         index = newIndex
+        pendingNextCount = 0
         // Mark adopted content as already-synced so syncEngineQueue() won't echo
         // it straight back to the engine.
         syncedQueueRef = queue
@@ -632,12 +658,19 @@ class PlayerController(private val scope: CoroutineScope) {
             if (n != null && preloadedId != null && preloadedId == queue.getOrNull(n)?.id &&
                 Engine.state() == Engine.PLAYING
             ) {
+                if (pendingNextCount > 0) pendingNextCount--
                 index = n
                 playingQueue = queue
                 playingIndex = index
                 preloadedId = null
                 scope.launch { armPreload() }
                 push()
+                return
+            }
+            if (pendingNextCount > 0 && index < queue.lastIndex) {
+                pendingNextCount--
+                index++
+                startCurrent()
                 return
             }
             if (repeatMode == 2) {

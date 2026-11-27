@@ -275,7 +275,9 @@
     </plurals>
     <!-- Éditeur de file + téléchargement hors ligne -->
     <string name="action_play_next">Lire ensuite</string>
-    <string name="action_add_to_queue">Ajouter à la file</string>
+    <string name="action_add_to_queue">Ajouter en dernier</string>
+    <string name="queue_added_next">À suivre : %1$s</string>
+    <string name="queue_added_last">Ajouté à la fin : %1$s</string>
     <string name="action_clear_queue">Vider la file</string>
     <string name="action_download_offline">Télécharger hors ligne</string>
     <string name="action_remove">Retirer</string>

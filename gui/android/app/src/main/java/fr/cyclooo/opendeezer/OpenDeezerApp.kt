@@ -148,6 +148,14 @@ private fun MainScaffold(vm: AppViewModel) {
         }
     }
 
+    LaunchedEffect(player) {
+        player.queueNotices.collect { notice ->
+            val label = if (notice.next) R.string.queue_added_next else R.string.queue_added_last
+            snackbarHostState.currentSnackbarData?.dismiss()
+            launch { snackbarHostState.showSnackbar(context.getString(label, notice.trackName)) }
+        }
+    }
+
     Scaffold(
         // Inner screen Scaffolds manage system-bar insets; this outer one only
         // contributes the bottom player bar so the top inset isn't applied twice.

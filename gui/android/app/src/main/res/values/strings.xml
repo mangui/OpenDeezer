@@ -308,7 +308,9 @@
     </plurals>
     <!-- Queue editor + download for offline -->
     <string name="action_play_next">Play next</string>
-    <string name="action_add_to_queue">Add to queue</string>
+    <string name="action_add_to_queue">Add to end of queue</string>
+    <string name="queue_added_next">Up next: %1$s</string>
+    <string name="queue_added_last">Added to end: %1$s</string>
     <string name="action_clear_queue">Clear queue</string>
     <string name="action_download_offline">Download for offline</string>
     <string name="action_remove">Remove</string>
